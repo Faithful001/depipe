@@ -65,7 +65,7 @@ class DeploymentService {
             );
             await this.runCommand("docker", ["stop", old.container_id], src, deployment.id);
             await this.runCommand("docker", ["rm", old.container_id], src, deployment.id);
-            deploymentRepository.updateStatus(old.id, "failed");
+            // deploymentRepository.updateStatus(old.id, "failed");
             if (old.host_port) portRepository.releasePort(old.host_port);
           } catch {
             console.log(`Failed to cleanup old container ${old.container_id}`);
