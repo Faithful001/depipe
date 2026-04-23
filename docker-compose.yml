@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  buildkit:
+    image: moby/buildkit
+    container_name: buildkit
+    privileged: true
+    restart: unless-stopped
+    networks:
+      - web
+
+  server:
+    build: ./server
+    image: depipe-server:latest
+    container_name: depipe-server
+    ports:
+      - "4000:4000"
+      - "4001-5000:4001-5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./server/data:/app/data
+      - ./server/repos:/app/repos
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - BUILDKIT_HOST=docker-container://buildkit
+    group_add:
+      - "999"
+    networks:
+      - web
+    depends_on:
+      - buildkit
+      - caddy
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    image: depipe-client:latest
+    container_name: depipe-client
+    ports:
+      - "3000:3000"
+    networks:
+      - web
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2019:2019"
+    volumes:
+      - ./server/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    restart: unless-stopped
+
+networks:
+  web:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
