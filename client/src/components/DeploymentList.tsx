@@ -11,15 +11,47 @@ export function DeploymentList({ onViewLogs }: DeploymentListProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
-            className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse"
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              opacity: 1 - i * 0.2,
+            }}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-gray-200" />
-              <div className="h-4 bg-gray-200 rounded w-32" />
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--border)',
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  height: 12,
+                  background: 'var(--surface-2)',
+                  borderRadius: 3,
+                  width: '40%',
+                  marginBottom: 6,
+                }}
+              />
+              <div
+                style={{
+                  height: 10,
+                  background: 'var(--surface-2)',
+                  borderRadius: 3,
+                  width: '25%',
+                }}
+              />
             </div>
           </div>
         ))}
@@ -29,30 +61,68 @@ export function DeploymentList({ onViewLogs }: DeploymentListProps) {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-sm text-red-600">Failed to load deployments</p>
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--red)',
+          borderRadius: 8,
+          padding: '12px 16px',
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: 'var(--red)',
+            fontFamily: 'IBM Plex Mono, monospace',
+          }}
+        >
+          ✕ Failed to load deployments
+        </p>
       </div>
     )
   }
 
   if (!deployments?.length) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <p className="text-sm text-gray-400">
-          No deployments yet. Create one above.
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px dashed var(--border)',
+          borderRadius: 8,
+          padding: '48px 16px',
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: 'var(--text-dim)',
+            fontFamily: 'IBM Plex Mono, monospace',
+          }}
+        >
+          no deployments yet
+        </p>
+        <p
+          style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-dim)' }}
+        >
+          Click "+ Deploy" to get started
         </p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {deployments.map((deployment) => (
-        <DeploymentCard
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {deployments.map((deployment, i) => (
+        <div
           key={deployment.id}
-          deployment={deployment}
-          onViewLogs={onViewLogs}
-        />
+          className="animate-fade-up"
+          style={{ animationDelay: `${i * 40}ms` }}
+        >
+          <DeploymentCard deployment={deployment} onViewLogs={onViewLogs} />
+        </div>
       ))}
     </div>
   )

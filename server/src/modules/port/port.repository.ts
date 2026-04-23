@@ -7,25 +7,34 @@ db.exec(`
 `);
 
 const START_PORT = 4001;
-const END_PORT = 5000;
+const END_PORT = 4020;
 
-export const portRepository = {
+class PortRepository {
   allocatePort(): number {
-    const result = db.prepare(`SELECT MAX(port) as last_port FROM ports`).get() as {
-      last_port: number | null;
-    };
+    return db.transaction(() => {
+      const result = db.prepare(`SELECT MAX(port) as last_port FROM ports`).get() as {
+        last_port: number | null;
+      };
 
-    const nextPort = result.last_port ? result.last_port + 1 : START_PORT;
+      console.log("max port", result.last_port);
 
-    if (nextPort > END_PORT) {
-      throw new Error("No available ports"); // limit to 1000 running containers for this lean version
-    }
+      const nextPort = result.last_port ? result.last_port + 1 : START_PORT;
 
-    db.prepare(`INSERT INTO ports (port) VALUES (?)`).run(nextPort);
-    return nextPort;
-  },
+      console.log("next port", nextPort);
+
+      if (nextPort > END_PORT) {
+        throw new Error("No available ports");
+      }
+
+      db.prepare(`INSERT INTO ports (port) VALUES (?)`).run(nextPort);
+
+      return nextPort;
+    })();
+  }
 
   releasePort(port: number): void {
     db.prepare(`DELETE FROM ports WHERE port = ?`).run(port);
-  },
-};
+  }
+}
+
+export const portRepository = new PortRepository();

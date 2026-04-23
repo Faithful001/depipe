@@ -1,6 +1,23 @@
 version: "3.8"
 
 services:
+  vault:
+    image: hashicorp/vault
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+      - SKIP_SETCAP=true
+    cap_add:
+      - IPC_LOCK
+    security_opt:
+      - no-new-privileges:false
+    networks:
+      - web
+    restart: unless-stopped
+
   buildkit:
     image: moby/buildkit
     container_name: buildkit
@@ -15,15 +32,17 @@ services:
     container_name: depipe-server
     ports:
       - "4000:4000"
-      - "4001-5000:4001-5000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./server/data:/app/data
+      # - depipe_data:/app/data
       - ./server/repos:/app/repos
     environment:
       - NODE_ENV=production
       - PORT=4000
       - BUILDKIT_HOST=docker-container://buildkit
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
     group_add:
       - "999"
     networks:
@@ -31,7 +50,9 @@ services:
     depends_on:
       - buildkit
       - caddy
+      - vault
     restart: unless-stopped
+    stop_grace_period: 5s
 
   client:
     build: ./client
@@ -44,6 +65,7 @@ services:
     depends_on:
       - server
     restart: unless-stopped
+    stop_grace_period: 5s
 
   caddy:
     image: caddy:latest
@@ -67,3 +89,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  # depipe_data:

@@ -11,7 +11,6 @@ export const deploymentsApi = {
 
   async deploy(payload: {
     gitUrl: string
-    containerPort: number
     env?: Record<string, string>
   }): Promise<{ containerId: string }> {
     const res = await fetch(`${BASE_URL}/deployments`, {
@@ -32,5 +31,17 @@ export const deploymentsApi = {
     const res = await fetch(`${BASE_URL}/deployments/${deploymentId}/logs`)
     const data = await res.json()
     return data.logs
+  },
+
+  async deployZip(formData: FormData): Promise<{ containerId: string }> {
+    const res = await fetch(`${BASE_URL}/deployments/zip`, {
+      method: 'POST',
+      body: formData, // no Content-Type header — browser sets it with boundary
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.message)
+    }
+    return res.json()
   },
 }

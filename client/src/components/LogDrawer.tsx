@@ -1,5 +1,4 @@
-// src/components/LogDrawer.tsx
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLogs } from '../hooks/useLogs'
 import { useDeploy } from '../hooks/useDeployments'
 import type { Deployment } from '../types'
@@ -12,14 +11,13 @@ interface LogDrawerProps {
 export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
   const logs = useLogs(deployment?.id ?? null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
   const { mutate: deploy, isPending } = useDeploy()
 
-  // auto scroll to bottom as logs come in
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [logs])
+    if (autoScroll) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs, autoScroll])
 
-  // close on escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -29,75 +27,253 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
   }, [onClose])
 
   const handleRedeploy = () => {
-    if (!deployment) return
-
-    const payload: any = {
+    if (!deployment?.git_url || !deployment?.env) return
+    deploy({
       gitUrl: deployment.git_url,
-      containerPort: deployment.container_port || 3000,
       env: deployment.env,
-    }
-
-    deploy(payload, { onSuccess: onClose })
+    })
   }
+
+  const cfg = {
+    running: '#22c55e',
+    building: '#3b82f6',
+    deploying: '#a855f7',
+    pending: '#eab308',
+    failed: '#ef4444',
+  }
+  const dotColor = cfg[deployment?.status as keyof typeof cfg] ?? '#71717a'
 
   return (
     <>
       {/* backdrop */}
       <div
-        className={`fixed inset-0 bg-black/30 z-40 transition-opacity duration-200 ${
-          deployment ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
         onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(2px)',
+          zIndex: 40,
+          opacity: deployment ? 1 : 0,
+          pointerEvents: deployment ? 'auto' : 'none',
+          transition: 'opacity 0.2s',
+        }}
       />
 
       {/* drawer */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 bg-gray-950 rounded-t-xl transition-transform duration-300 ease-in-out ${
-          deployment ? 'translate-y-0' : 'translate-y-full'
-        }`}
-        style={{ height: '60vh' }}
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '55vh',
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          zIndex: 50,
+          transform: deployment ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
-        {/* header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-white">
-              {deployment?.image}
-            </span>
-            <span className="text-xs text-gray-400">{deployment?.status}</span>
-          </div>
+        {/* drawer header */}
+        <div
+          style={{
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: dotColor,
+              flexShrink: 0,
+            }}
+          />
 
-          <div className="flex items-center gap-2">
-            {/* redeploy button - only show on failed */}
-            {deployment?.status === 'failed' && (
-              <button
-                onClick={handleRedeploy}
-                disabled={isPending}
-                className="px-3 py-1.5 text-xs font-medium bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
-              >
-                {isPending ? 'Redeploying...' : 'Redeploy'}
-              </button>
-            )}
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 500,
+              color: 'var(--text)',
+              fontFamily: 'IBM Plex Mono, monospace',
+            }}
+          >
+            {deployment?.image}
+          </span>
 
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors text-lg leading-none"
+          <span
+            style={{
+              fontSize: 10,
+              color: dotColor,
+              background: `${dotColor}18`,
+              border: `1px solid ${dotColor}30`,
+              padding: '1px 6px',
+              borderRadius: 3,
+              fontFamily: 'IBM Plex Mono, monospace',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {deployment?.status}
+          </span>
+
+          {deployment?.url && (
+            <a
+              href={deployment.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 11,
+                color: 'var(--accent)',
+                fontFamily: 'IBM Plex Mono, monospace',
+                textDecoration: 'none',
+              }}
             >
-              ✕
+              ↗ {deployment.url}
+            </a>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {/* auto scroll toggle */}
+          <button
+            onClick={() => setAutoScroll((p) => !p)}
+            style={{
+              background: autoScroll ? 'var(--accent-dim)' : 'transparent',
+              border: `1px solid ${autoScroll ? 'var(--accent)' : 'var(--border)'}`,
+              color: autoScroll ? 'var(--accent)' : 'var(--text-muted)',
+              borderRadius: 4,
+              padding: '3px 8px',
+              fontSize: 10,
+              cursor: 'pointer',
+              fontFamily: 'IBM Plex Mono, monospace',
+            }}
+          >
+            auto-scroll
+          </button>
+
+          {deployment?.status === 'failed' && (
+            <button
+              onClick={handleRedeploy}
+              disabled={isPending}
+              style={{
+                background: 'var(--red)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                padding: '4px 10px',
+                fontSize: 11,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                opacity: isPending ? 0.5 : 1,
+                fontFamily: 'IBM Plex Sans, sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              {isPending ? 'redeploying...' : '↺ redeploy'}
             </button>
-          </div>
+          )}
+
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: '1px solid var(--border)',
+              color: 'var(--text-muted)',
+              borderRadius: 4,
+              padding: '3px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* log count */}
+        <div
+          style={{
+            padding: '4px 16px',
+            borderBottom: '1px solid var(--border-subtle)',
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10,
+              color: 'var(--text-dim)',
+              fontFamily: 'IBM Plex Mono, monospace',
+            }}
+          >
+            {logs.length} lines
+          </span>
         </div>
 
         {/* logs */}
-        <div className="h-full overflow-y-auto p-4 pb-16 font-mono text-xs">
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 16px',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 12,
+            lineHeight: 1.7,
+          }}
+        >
           {logs.length === 0 ? (
-            <p className="text-gray-500">Waiting for logs...</p>
+            <p style={{ margin: 0, color: 'var(--text-dim)' }}>
+              waiting for logs
+              <span
+                style={{
+                  animation: 'pulse-dot 1s infinite',
+                  display: 'inline-block',
+                  marginLeft: 2,
+                }}
+              >
+                _
+              </span>
+            </p>
           ) : (
-            logs.map((log) => (
-              <div key={log.id} className="flex gap-3 py-0.5">
-                <span className="text-gray-600 shrink-0">
-                  {new Date(log.created_at).toLocaleTimeString()}
+            logs.map((log, i) => (
+              <div
+                key={log.id}
+                style={{ display: 'flex', gap: 16, paddingBottom: 1 }}
+              >
+                <span
+                  style={{
+                    color: 'var(--text-dim)',
+                    flexShrink: 0,
+                    userSelect: 'none',
+                    fontSize: 10,
+                    paddingTop: 2,
+                  }}
+                >
+                  {String(i + 1).padStart(4, ' ')}
                 </span>
-                <span className="text-green-400 whitespace-pre-wrap break-all">
+                <span
+                  style={{
+                    color:
+                      log.message.toLowerCase().includes('error') ||
+                      log.message.toLowerCase().includes('fail')
+                        ? 'var(--red)'
+                        : log.message.toLowerCase().includes('success') ||
+                            log.message.toLowerCase().includes('done') ||
+                            log.message.toLowerCase().includes('complete')
+                          ? 'var(--green)'
+                          : log.message.startsWith('#')
+                            ? 'var(--text-muted)'
+                            : 'var(--text)',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}
+                >
                   {log.message}
                 </span>
               </div>

@@ -4,6 +4,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import '../styles.css'
+import { Toaster } from 'sonner'
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -22,6 +23,7 @@ function RootComponent() {
   return (
     <>
       <QueryClientProvider client={queryClient}>
+        <Toaster />
         <Outlet />
         <TanStackDevtools
           config={{

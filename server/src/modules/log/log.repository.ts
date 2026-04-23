@@ -1,6 +1,6 @@
 import db from "../../db/database";
 
-export const logRepository = {
+class LogRepository {
   insert(deploymentId: string, message: string): void {
     db.prepare(
       `
@@ -8,7 +8,7 @@ export const logRepository = {
       VALUES (?, ?)
     `
     ).run(deploymentId, message);
-  },
+  }
 
   findByDeploymentId(deploymentId: string): { id: number; message: string; created_at: string }[] {
     return db
@@ -18,5 +18,7 @@ export const logRepository = {
     `
       )
       .all(deploymentId) as any[];
-  },
-};
+  }
+}
+
+export const logRepository = new LogRepository();

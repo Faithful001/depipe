@@ -1,19 +1,14 @@
 import type { Deployment, DeploymentStatus } from '../types'
 
-const statusColors: Record<DeploymentStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  building: 'bg-blue-100 text-blue-700',
-  deploying: 'bg-purple-100 text-purple-700',
-  running: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
-}
-
-const statusDot: Record<DeploymentStatus, string> = {
-  pending: 'bg-yellow-400',
-  building: 'bg-blue-400 animate-pulse',
-  deploying: 'bg-purple-400 animate-pulse',
-  running: 'bg-green-400',
-  failed: 'bg-red-400',
+const statusConfig: Record<
+  DeploymentStatus,
+  { color: string; dot: string; pulse: boolean }
+> = {
+  pending: { color: 'var(--yellow)', dot: '#eab308', pulse: false },
+  building: { color: 'var(--blue)', dot: '#3b82f6', pulse: true },
+  deploying: { color: 'var(--purple)', dot: '#a855f7', pulse: true },
+  running: { color: 'var(--green)', dot: '#22c55e', pulse: false },
+  failed: { color: 'var(--red)', dot: '#ef4444', pulse: false },
 }
 
 interface DeploymentCardProps {
@@ -25,55 +20,116 @@ export function DeploymentCard({
   deployment,
   onViewLogs,
 }: DeploymentCardProps) {
+  const cfg = statusConfig[deployment.status] ?? statusConfig.pending
+  const shortId = deployment.id.slice(0, 7)
+  const repoName = deployment.git_url
+    ? deployment.git_url.split('/').slice(-2).join('/')
+    : deployment.image
+
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between gap-4">
-      {/* left side */}
-      <div className="flex items-center gap-3 min-w-0">
-        {/* status dot */}
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${statusDot[deployment.status]}`}
-        />
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, background 0.15s',
+      }}
+      onMouseOver={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border)'
+        e.currentTarget.style.background = 'var(--surface-2)'
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border)'
+        e.currentTarget.style.background = 'var(--surface)'
+      }}
+      onClick={() => onViewLogs(deployment)}
+    >
+      {/* status dot */}
+      <div
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: cfg.dot,
+          flexShrink: 0,
+          animation: cfg.pulse ? 'pulse-dot 1.5s ease-in-out infinite' : 'none',
+        }}
+      />
 
-        {/* image name */}
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
-            {deployment.image}
-          </p>
-          <p className="text-xs text-gray-400">
-            {new Date(deployment.created_at).toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      {/* middle - status + url */}
-      <div className="flex items-center gap-3 shrink-0">
-        {/* status badge */}
-        <span
-          className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[deployment.status]}`}
+      {/* repo name + image */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'var(--text)',
+            fontFamily: 'IBM Plex Mono, monospace',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
         >
-          {deployment.status}
-        </span>
-
-        {/* live url */}
-        {deployment.url && (
-          <a
-            href={deployment.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline truncate max-w-[160px]"
-          >
-            {deployment.url}
-          </a>
-        )}
+          {repoName}
+        </p>
+        <p
+          style={{
+            margin: '2px 0 0',
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            fontFamily: 'IBM Plex Mono, monospace',
+          }}
+        >
+          {new Date(deployment.created_at).toLocaleString()} · {shortId}
+        </p>
       </div>
 
-      {/* right side - logs button */}
-      <button
-        onClick={() => onViewLogs(deployment)}
-        className="shrink-0 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+      {/* status badge */}
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: cfg.color,
+          background: `${cfg.dot}18`,
+          border: `1px solid ${cfg.dot}30`,
+          padding: '2px 8px',
+          borderRadius: 4,
+          fontFamily: 'IBM Plex Mono, monospace',
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          flexShrink: 0,
+        }}
       >
-        View Logs
-      </button>
+        {deployment.status}
+      </span>
+
+      {/* live url */}
+      {deployment.url && (
+        <a
+          href={deployment.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            fontSize: 11,
+            color: 'var(--accent)',
+            fontFamily: 'IBM Plex Mono, monospace',
+            textDecoration: 'none',
+            flexShrink: 0,
+          }}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.textDecoration = 'underline')
+          }
+          onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+        >
+          ↗ visit
+        </a>
+      )}
     </div>
   )
 }

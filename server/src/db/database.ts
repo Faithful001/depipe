@@ -12,19 +12,17 @@ if (!fs.existsSync(DB_DIR)) {
 
 const db: BetterSqliteDatabase = new Database(DB_PATH);
 
-// enable WAL mode for better performance
-db.pragma("journal_mode = WAL");
+db.pragma("journal_mode = DELETE");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS deployments (
     id TEXT PRIMARY KEY,
     image TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'building', 'deploying', 'running', 'failed')),
     container_id TEXT,
     host_port INTEGER,
     container_port INTEGER,
     git_url TEXT,
-    env TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -41,11 +39,11 @@ db.exec(`
 `);
 
 // migrate existing table to add new columns if they don't exist
-const columns = db.prepare(`PRAGMA table_info(deployments)`).all() as { name: string }[];
-const columnNames = columns.map((c) => c.name);
+// const columns = db.prepare(`PRAGMA table_info(deployments)`).all() as { name: string }[];
+// const columnNames = columns.map((c) => c.name);
 
-if (!columnNames.includes("env")) {
-  db.exec(`ALTER TABLE deployments ADD COLUMN env TEXT`);
-}
+// if (columnNames.includes("env")) {
+//   db.exec(`ALTER TABLE deployments DROP COLUMN env`);
+// }
 
 export default db;
