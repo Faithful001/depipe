@@ -10,7 +10,9 @@ class LogRepository {
     });
   }
 
-  async findByDeploymentId(deploymentId: string): Promise<{ id: number; message: string; created_at: Date }[]> {
+  async findByDeploymentId(
+    deploymentId: string
+  ): Promise<{ id: number; message: string; created_at: Date }[]> {
     const logs = await db.log.findMany({
       where: { deployment_id: deploymentId },
       orderBy: { id: "asc" },

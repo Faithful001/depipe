@@ -6,27 +6,25 @@ const END_PORT = 4020;
 
 class PortRepository {
   async allocatePort(): Promise<number> {
-    return await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      const result = await tx.port.aggregate({
-        _max: { port: true },
-      });
-
-      const maxPort = result._max.port;
-      console.log("max port", maxPort);
-
-      const nextPort = maxPort !== null ? maxPort + 1 : START_PORT;
-      console.log("next port", nextPort);
-
-      if (nextPort > END_PORT) {
-        throw new Error("No available ports");
-      }
-
-      await tx.port.create({
-        data: { port: nextPort },
-      });
-
-      return nextPort;
+    const result = await db.port.aggregate({
+      _max: { port: true },
     });
+
+    const maxPort = result._max.port;
+    console.log("max port", maxPort);
+
+    const nextPort = maxPort !== null ? maxPort + 1 : START_PORT;
+    console.log("next port", nextPort);
+
+    if (nextPort > END_PORT) {
+      throw new Error("No available ports");
+    }
+
+    await db.port.create({
+      data: { port: nextPort },
+    });
+
+    return nextPort;
   }
 
   async releasePort(port: number): Promise<void> {

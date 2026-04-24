@@ -1,3 +1,4 @@
+import { useLogs } from '#/hooks/useLogs'
 import type { Deployment, DeploymentStatus } from '../types'
 
 const statusConfig: Record<
@@ -20,7 +21,13 @@ export function DeploymentCard({
   deployment,
   onViewLogs,
 }: DeploymentCardProps) {
-  const cfg = statusConfig[deployment.status] ?? statusConfig.pending
+  const { liveStatus } = useLogs(deployment?.id ?? null)
+  const currentStatus = liveStatus ?? deployment?.status ?? 'pending'
+
+  const cfg =
+    statusConfig[currentStatus as keyof typeof statusConfig] ??
+    statusConfig.pending
+
   const shortId = deployment.id.slice(0, 7)
   const repoName = deployment.git_url
     ? new URL(deployment.git_url).pathname.replace(/^\/|\.git$/g, '')
@@ -105,7 +112,7 @@ export function DeploymentCard({
           flexShrink: 0,
         }}
       >
-        {deployment.status}
+        {currentStatus}
       </span>
 
       {/* live url */}

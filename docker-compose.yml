@@ -31,15 +31,15 @@ services:
     image: depipe-server:latest
     container_name: depipe-server
     ports:
-      - "4000:4000"
+      - "8000:8000"
+      - "5555:5555"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./server/data:/app/data
-      # - depipe_data:/app/data
-      - ./server/repos:/app/repos
+      - depipe_data:/app/data
+      - depipe_repos:/app/repos
     environment:
       - NODE_ENV=production
-      - PORT=4000
+      - PORT=8000
       - BUILDKIT_HOST=docker-container://buildkit
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
@@ -89,4 +89,5 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
-  # depipe_data:
+  depipe_data:
+  depipe_repos:

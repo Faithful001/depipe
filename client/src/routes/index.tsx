@@ -136,7 +136,11 @@ function HomePage() {
       {/* log drawer */}
       <LogDrawer
         deployment={selectedDeployment}
-        onClose={() => setSelectedDeployment(null)}
+        onClose={() => {
+          setTimeout(() => {
+            setSelectedDeployment(null)
+          }, 300)
+        }}
       />
     </div>
   )

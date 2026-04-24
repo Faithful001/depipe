@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLogs } from '../hooks/useLogs'
-import { useDeploy } from '../hooks/useDeployments'
+import { useDeploy, useDeployment } from '../hooks/useDeployments'
 import type { Deployment } from '../types'
 
 interface LogDrawerProps {
@@ -8,8 +8,16 @@ interface LogDrawerProps {
   onClose: () => void
 }
 
-export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
-  const logs = useLogs(deployment?.id ?? null)
+export function LogDrawer({
+  deployment: initialDeployment,
+  onClose,
+}: LogDrawerProps) {
+  const { data: fetchedDeployment } = useDeployment(initialDeployment?.id ?? '')
+  const deployment = fetchedDeployment ?? initialDeployment
+
+  const { logs, liveStatus } = useLogs(deployment?.id ?? null)
+  const currentStatus = liveStatus ?? deployment?.status ?? 'pending'
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const { mutate: deploy, isPending } = useDeploy()
@@ -41,7 +49,7 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
     pending: '#eab308',
     failed: '#ef4444',
   }
-  const dotColor = cfg[deployment?.status as keyof typeof cfg] ?? '#71717a'
+  const dotColor = cfg[currentStatus as keyof typeof cfg] ?? '#71717a'
 
   return (
     <>
@@ -122,7 +130,7 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
               letterSpacing: '0.04em',
             }}
           >
-            {deployment?.status}
+            {currentStatus}
           </span>
 
           {deployment?.url && (
@@ -160,7 +168,7 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
             auto-scroll
           </button>
 
-          {deployment?.status === 'failed' && (
+          {currentStatus === 'failed' && (
             <button
               onClick={handleRedeploy}
               disabled={isPending}

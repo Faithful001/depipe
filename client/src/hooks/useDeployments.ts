@@ -9,11 +9,24 @@ export function useDeployments() {
   })
 }
 
+export function useDeployment(deploymentId: string) {
+  return useQuery({
+    queryKey: ['deployment', deploymentId],
+    queryFn: () => deploymentsApi.getById(deploymentId),
+    enabled: !!deploymentId,
+  })
+}
+
 export function useDeploy() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: { gitUrl: string; env?: Record<string, string> }) =>
-      deploymentsApi.deploy(payload),
+    mutationFn: async (payload: {
+      gitUrl: string
+      env?: Record<string, string>
+    }) => {
+      const data = await deploymentsApi.deploy(payload)
+      return data
+    },
     onSuccess: (data: any) => {
       toast.success(
         data?.data?.message || data?.message || 'Deployment completed',

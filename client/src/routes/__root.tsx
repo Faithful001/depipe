@@ -10,14 +10,7 @@ export const Route = createRootRoute({
   component: RootComponent,
 })
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchInterval: 3000,
-      staleTime: 0,
-    },
-  },
-})
+const queryClient = new QueryClient()
 
 function RootComponent() {
   return (

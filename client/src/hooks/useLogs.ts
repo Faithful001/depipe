@@ -1,23 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { deploymentsApi } from '../api/deployments'
 import type { Log } from '../types'
+import { useQueryClient } from '@tanstack/react-query'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function useLogs(deploymentId: string | null) {
   const [logs, setLogs] = useState<Log[]>([])
+  const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const queryClient = useQueryClient()
 
-  // load persisted logs first
   useEffect(() => {
     if (!deploymentId) {
       setLogs([])
+      setLiveStatus(null)
       return
     }
     deploymentsApi.getLogs(deploymentId).then(setLogs)
   }, [deploymentId])
 
-  // open SSE stream for live logs
   useEffect(() => {
     if (!deploymentId) return
 
@@ -27,15 +29,26 @@ export function useLogs(deploymentId: string | null) {
 
     eventSourceRef.current.onmessage = (e) => {
       const data = JSON.parse(e.data)
-      setLogs((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          deployment_id: deploymentId,
-          message: data.message,
-          created_at: new Date().toISOString(),
-        },
-      ])
+
+      if (data.type === 'status') {
+        setLiveStatus(data.status)
+        if (data.status === 'running') {
+          queryClient.invalidateQueries({ queryKey: ['deployments'] })
+          queryClient.invalidateQueries({
+            queryKey: ['deployment', deploymentId],
+          })
+        }
+      } else if (data.type === 'log') {
+        setLogs((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            deployment_id: deploymentId,
+            message: data.message,
+            created_at: new Date().toISOString(),
+          },
+        ])
+      }
     }
 
     eventSourceRef.current.onerror = () => {
@@ -47,5 +60,5 @@ export function useLogs(deploymentId: string | null) {
     }
   }, [deploymentId])
 
-  return logs
+  return { logs, liveStatus }
 }

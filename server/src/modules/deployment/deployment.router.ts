@@ -4,9 +4,11 @@ import { upload } from "../../core/upload";
 
 const router = Router();
 
-router.post("/deployments", deploymentController.deploy);
-router.post("/deployments/zip", upload.single("file"), deploymentController.deployZip);
-router.get("/deployments", deploymentController.getAll);
-router.get("/deployments/:deploymentId/logs", deploymentController.getLogs);
+router.post("/deployments", (req, res) => deploymentController.deploy(req, res));
+router.post("/deployments/zip", upload.single("file"), (req, res) =>
+  deploymentController.deployZip(req, res)
+);
+router.get("/deployments", (req, res) => deploymentController.getAll(req, res));
+router.get("/deployments/:deploymentId/logs", (req, res) => deploymentController.getLogs(req, res));
 
 export default router;

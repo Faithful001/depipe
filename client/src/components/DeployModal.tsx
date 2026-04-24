@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useIsFetching } from '@tanstack/react-query'
 import { useDeploy, useDeployZip } from '../hooks/useDeployments'
 import { getErrorMessage } from '#/utils/get-error-message'
 
@@ -25,6 +26,7 @@ export function DeployModal({ onClose }: DeployModalProps) {
   const [envVars, setEnvVars] = useState('')
   const [dragOver, setDragOver] = useState(false)
 
+  const isFetchingDeployments = useIsFetching({ queryKey: ['deployments'] }) > 0
   const { mutate: deploy, isPending, error } = useDeploy()
 
   const {
@@ -34,12 +36,12 @@ export function DeployModal({ onClose }: DeployModalProps) {
   } = useDeployZip()
 
   useEffect(() => {
-    setTimeout(() => {
-      if (isPending || isPendingZip) {
+    if (isFetchingDeployments && (isPending || isPendingZip)) {
+      setTimeout(() => {
         onClose()
-      }
-    }, 2000)
-  }, [isPending, isPendingZip])
+      }, 4000)
+    }
+  }, [isFetchingDeployments, isPending, isPendingZip, onClose])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

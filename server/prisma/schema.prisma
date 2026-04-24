@@ -27,7 +27,7 @@ model Log {
   deployment_id String
   message       String
   created_at    DateTime   @default(now())
-  deployment    Deployment @relation(fields: [deployment_id], references: [id])
+  deployment    Deployment @relation(fields: [deployment_id], references: [id], onDelete: Cascade)
 
   @@map("logs")
 }

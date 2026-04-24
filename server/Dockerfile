@@ -32,8 +32,8 @@ RUN npx prisma generate
 
 RUN npm run build
 
-EXPOSE 4000
+EXPOSE 8000
 
 STOPSIGNAL SIGTERM
 
-CMD ["sh", "-c", "DATABASE_URL=\"file:/app/data/depipe.db\" npx prisma db push --skip-generate && npm start"]
+CMD ["sh", "-c", "DATABASE_URL=\"file:/app/data/depipe.db\" npx prisma db push --accept-data-loss && npm start"]
