@@ -139,7 +139,7 @@ function HomePage() {
         onClose={() => {
           setTimeout(() => {
             setSelectedDeployment(null)
-          }, 300)
+          }, 1000)
         }}
       />
     </div>

@@ -7,14 +7,13 @@ import simpleGit from "simple-git";
 import path from "node:path";
 import fs from "node:fs";
 import { vaultService } from "../../core/vault";
-import { deploymentQueue } from "../../core/queue";
+import { deploymentQueue } from "../../core/jobs/deployment.queue";
 
 class DeploymentService {
   async deploy(
     source: { type: "git"; gitUrl: string } | { type: "zip"; zipPath: string; imageName: string },
     env?: Record<string, string>
   ): Promise<{ id: string }> {
-    console.log("deployment started");
     const image =
       source.type === "git" ? source.gitUrl.split("/").pop()!.split(".")[0] : source.imageName;
 
@@ -26,28 +25,21 @@ class DeploymentService {
 
     sse.emitStatus(deployment.id, "pending");
 
-    console.log("adding to queue");
-
-    // add the actual deployment process to the queue
-    deploymentQueue.add(async () => {
-      console.log("processing queue");
-      try {
-        console.log("executing deployment");
-        await this.executeDeployment(deployment, source, env);
-      } catch (error: any) {
-        console.error(`Deployment ${deployment.id} failed:`, error.message);
-        await deploymentRepository.updateStatus(deployment.id, "failed");
-        sse.emitStatus(deployment.id, "failed");
-        console.log("deployment in queue failed");
+    // add job to BullMQ queue
+    await deploymentQueue.add(
+      "deploy",
+      { deploymentId: deployment.id, source, env },
+      {
+        attempts: 1,
+        removeOnComplete: 100,
+        removeOnFail: 100,
       }
-    });
-
-    console.log("return id", deployment.id);
+    );
 
     return { id: deployment.id };
   }
 
-  private async executeDeployment(
+  public async executeDeployment(
     deployment: any,
     source: { type: "git"; gitUrl: string } | { type: "zip"; zipPath: string; imageName: string },
     env?: Record<string, string>
