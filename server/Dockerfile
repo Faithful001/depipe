@@ -25,8 +25,8 @@ COPY package*.json .
 
 RUN npm ci
 
-# rebuild native modules for Linux separately
-RUN npm rebuild better-sqlite3
+# generate prisma client
+RUN npx prisma generate
 
 COPY . .
 

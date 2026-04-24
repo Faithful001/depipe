@@ -1,39 +1,42 @@
 import db from "../../db/database";
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS ports (
-    port INTEGER PRIMARY KEY
-  );
-`);
+import { Prisma } from "@prisma/client";
 
 const START_PORT = 4001;
 const END_PORT = 4020;
 
 class PortRepository {
-  allocatePort(): number {
-    return db.transaction(() => {
-      const result = db.prepare(`SELECT MAX(port) as last_port FROM ports`).get() as {
-        last_port: number | null;
-      };
+  async allocatePort(): Promise<number> {
+    return await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const result = await tx.port.aggregate({
+        _max: { port: true },
+      });
 
-      console.log("max port", result.last_port);
+      const maxPort = result._max.port;
+      console.log("max port", maxPort);
 
-      const nextPort = result.last_port ? result.last_port + 1 : START_PORT;
-
+      const nextPort = maxPort !== null ? maxPort + 1 : START_PORT;
       console.log("next port", nextPort);
 
       if (nextPort > END_PORT) {
         throw new Error("No available ports");
       }
 
-      db.prepare(`INSERT INTO ports (port) VALUES (?)`).run(nextPort);
+      await tx.port.create({
+        data: { port: nextPort },
+      });
 
       return nextPort;
-    })();
+    });
   }
 
-  releasePort(port: number): void {
-    db.prepare(`DELETE FROM ports WHERE port = ?`).run(port);
+  async releasePort(port: number): Promise<void> {
+    try {
+      await db.port.delete({
+        where: { port },
+      });
+    } catch (e) {
+      // ignore error if the port doesn't exist
+    }
   }
 }
 

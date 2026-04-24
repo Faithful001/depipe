@@ -66,9 +66,9 @@ class DeploymentController {
     }
   }
 
-  getAll(req: Request, res: Response) {
+  async getAll(req: Request, res: Response) {
     try {
-      const deployments = deploymentRepository.findAll();
+      const deployments = await deploymentRepository.findAll();
       const deploymentsWithUrl = deployments.map((d) => ({
         ...d,
         url: d.status === "running" ? `http://${d.image}.localhost` : null,
@@ -80,14 +80,14 @@ class DeploymentController {
     }
   }
 
-  getLogs(req: Request, res: Response) {
+  async getLogs(req: Request, res: Response) {
     try {
       const { deploymentId } = req.params;
-      const deployment = deploymentRepository.findById(deploymentId as string);
+      const deployment = await deploymentRepository.findById(deploymentId as string);
       if (!deployment) {
         return res.status(404).json({ success: false, message: "Deployment not found" });
       }
-      const logs = logRepository.findByDeploymentId(deploymentId as string);
+      const logs = await logRepository.findByDeploymentId(deploymentId as string);
       return res.status(200).json({ success: true, logs });
     } catch (err: unknown) {
       const error = err as Error;
@@ -95,10 +95,10 @@ class DeploymentController {
     }
   }
 
-  streamLogs(req: Request, res: Response) {
+  async streamLogs(req: Request, res: Response) {
     try {
       const { deploymentId } = req.params;
-      const deployment = deploymentRepository.findById(deploymentId as string);
+      const deployment = await deploymentRepository.findById(deploymentId as string);
       if (!deployment) {
         return res.status(404).json({ success: false, message: "Deployment not found" });
       }

@@ -16,15 +16,15 @@ class DeploymentService {
     const image =
       source.type === "git" ? source.gitUrl.split("/").pop()!.split(".")[0] : source.imageName;
 
-    const sameImageHostPort = deploymentRepository.findByImage(image)?.[0]?.host_port;
+    const sameImageHostPort = (await deploymentRepository.findByImage(image))?.[0]?.host_port;
 
     console.log("sameImageHostPort", sameImageHostPort);
 
-    const hostPort = sameImageHostPort || portRepository.allocatePort();
+    const hostPort = sameImageHostPort || (await portRepository.allocatePort());
 
     console.log("hostPort", hostPort);
 
-    const deployment = deploymentRepository.create({
+    const deployment = await deploymentRepository.create({
       image,
       status: "pending",
       git_url: source.type === "git" ? source.gitUrl : null,
@@ -46,21 +46,21 @@ class DeploymentService {
       }
 
       // building
-      deploymentRepository.updateStatus(deployment.id, "building");
+      await deploymentRepository.updateStatus(deployment.id, "building");
       sse.emit(deployment.id, "building");
       const containerPort = await this.buildImage(src, image, deployment.id);
-      deploymentRepository.updateContainerPort(deployment.id, containerPort);
+      await deploymentRepository.updateContainerPort(deployment.id, containerPort);
 
       // deploying
-      deploymentRepository.updateStatus(deployment.id, "deploying");
+      await deploymentRepository.updateStatus(deployment.id, "deploying");
       sse.emit(deployment.id, "deploying");
 
       const storedEnv = env ? await vaultService.getEnv(deployment.id) : undefined;
 
       // stop old running containers for this image
-      const oldDeployments = deploymentRepository
-        .findByImage(image)
-        .filter((d) => d.id !== deployment.id && d.status === "running");
+      const oldDeployments = (await deploymentRepository.findByImage(image)).filter(
+        (d) => d.id !== deployment.id && d.status === "running"
+      );
 
       for (const old of oldDeployments) {
         if (old.container_id) {
@@ -73,7 +73,7 @@ class DeploymentService {
             await this.runCommand("docker", ["rm", old.container_id], src, deployment.id);
             // only release port if we aren't reusing it for the new container
             if (old.host_port && old.host_port !== hostPort) {
-              portRepository.releasePort(old.host_port);
+              await portRepository.releasePort(old.host_port);
             }
           } catch {
             console.log(`Failed to cleanup old container ${old.container_id}`);
@@ -90,9 +90,9 @@ class DeploymentService {
         env: storedEnv,
       });
 
-      deploymentRepository.updateContainerId(deployment.id, containerId);
-      deploymentRepository.updateHostPort(deployment.id, hostPort);
-      deploymentRepository.updateStatus(deployment.id, "running");
+      await deploymentRepository.updateContainerId(deployment.id, containerId);
+      await deploymentRepository.updateHostPort(deployment.id, hostPort);
+      await deploymentRepository.updateStatus(deployment.id, "running");
       sse.emit(deployment.id, "running");
 
       await this.reloadCaddy();
@@ -100,8 +100,8 @@ class DeploymentService {
     } catch (err: unknown) {
       const error = err as Error;
       console.error(error.message);
-      portRepository.releasePort(hostPort);
-      deploymentRepository.updateStatus(deployment.id, "failed");
+      await portRepository.releasePort(hostPort);
+      await deploymentRepository.updateStatus(deployment.id, "failed");
       sse.emit(deployment.id, "failed");
       throw error;
     }
@@ -201,7 +201,7 @@ class DeploymentService {
   }
 
   public async reloadCaddy(): Promise<void> {
-    const runningDeployments = deploymentRepository.findByStatus("running");
+    const runningDeployments = await deploymentRepository.findByStatus("running");
 
     const routes = runningDeployments.map((deployment) => ({
       match: [{ host: [`${deployment.image}.localhost`] }],

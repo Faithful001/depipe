@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  pending,
+  building,
+  deploying,
+  running,
+  failed
+}
+
+model Deployment {
+  id             String   @id @default(uuid())
+  image          String
+  status         Status   @default(pending)
+  container_id   String?
+  host_port      Int?
+  container_port Int?
+  git_url        String?
+  created_at     DateTime @default(now())
+  logs           Log[]
+
+  @@index([status])
+  @@map("deployments")
+}
+
+model Log {
+  id            Int        @id @default(autoincrement())
+  deployment_id String
+  message       String
+  created_at    DateTime   @default(now())
+  deployment    Deployment @relation(fields: [deployment_id], references: [id])
+
+  @@map("logs")
+}
+
+model Port {
+  port Int @id
+
+  @@map("ports")
+}
