@@ -25,10 +25,10 @@ COPY package*.json .
 
 RUN npm ci
 
+COPY . .
+
 # generate prisma client
 RUN npx prisma generate
-
-COPY . .
 
 RUN npm run build
 

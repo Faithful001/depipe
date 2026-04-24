@@ -7,18 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Status {
-  pending,
-  building,
-  deploying,
-  running,
-  failed
-}
-
 model Deployment {
   id             String   @id @default(uuid())
   image          String
-  status         Status   @default(pending)
+  status         String   @default("pending")
   container_id   String?
   host_port      Int?
   container_port Int?
