@@ -13,10 +13,16 @@ class DeploymentService {
     source: { type: "git"; gitUrl: string } | { type: "zip"; zipPath: string; imageName: string },
     env?: Record<string, string>
   ): Promise<string | null> {
-    const hostPort = portRepository.allocatePort();
-
     const image =
       source.type === "git" ? source.gitUrl.split("/").pop()!.split(".")[0] : source.imageName;
+
+    const sameImageHostPort = deploymentRepository.findByImage(image)?.[0]?.host_port;
+
+    console.log("sameImageHostPort", sameImageHostPort);
+
+    const hostPort = sameImageHostPort || portRepository.allocatePort();
+
+    console.log("hostPort", hostPort);
 
     const deployment = deploymentRepository.create({
       image,
@@ -65,8 +71,10 @@ class DeploymentService {
             );
             await this.runCommand("docker", ["stop", old.container_id], src, deployment.id);
             await this.runCommand("docker", ["rm", old.container_id], src, deployment.id);
-            // deploymentRepository.updateStatus(old.id, "failed");
-            if (old.host_port) portRepository.releasePort(old.host_port);
+            // only release port if we aren't reusing it for the new container
+            if (old.host_port && old.host_port !== hostPort) {
+              portRepository.releasePort(old.host_port);
+            }
           } catch {
             console.log(`Failed to cleanup old container ${old.container_id}`);
           }

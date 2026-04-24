@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDeploy, useDeployZip } from '../hooks/useDeployments'
 import { getErrorMessage } from '#/utils/get-error-message'
 
@@ -32,6 +32,14 @@ export function DeployModal({ onClose }: DeployModalProps) {
     isPending: isPendingZip,
     error: errorZip,
   } = useDeployZip()
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (isPending || isPendingZip) {
+        onClose()
+      }
+    }, 3000)
+  }, [isPending, isPendingZip])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
