@@ -36,4 +36,4 @@ EXPOSE 4000
 
 STOPSIGNAL SIGTERM
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "DATABASE_URL=\"file:/app/data/depipe.db\" npx prisma db push --skip-generate && npm start"]
