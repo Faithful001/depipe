@@ -16,7 +16,7 @@ export function useDeploy() {
       deploymentsApi.deploy(payload),
     onSuccess: (data: any) => {
       toast.success(
-        data?.data?.message || data?.message || 'Deployment started',
+        data?.data?.message || data?.message || 'Deployment completed',
       )
       queryClient.invalidateQueries({ queryKey: ['deployments'] })
     },
