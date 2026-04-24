@@ -23,7 +23,7 @@ export function DeploymentCard({
   const cfg = statusConfig[deployment.status] ?? statusConfig.pending
   const shortId = deployment.id.slice(0, 7)
   const repoName = deployment.git_url
-    ? deployment.git_url.split('/').slice(-2).join('/')
+    ? new URL(deployment.git_url).pathname.replace(/^\/|\.git$/g, '')
     : deployment.image
 
   return (

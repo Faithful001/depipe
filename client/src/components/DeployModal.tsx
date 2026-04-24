@@ -38,7 +38,7 @@ export function DeployModal({ onClose }: DeployModalProps) {
       if (isPending || isPendingZip) {
         onClose()
       }
-    }, 3000)
+    }, 2000)
   }, [isPending, isPendingZip])
 
   const handleSubmit = (e: React.FormEvent) => {
