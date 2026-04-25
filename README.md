@@ -16,7 +16,7 @@ A single-page deployment pipeline that takes a Git URL or a zipped project and t
 
 ## Loom Walkthrough
 
-> Add your Loom link here once recorded.
+> https://www.loom.com/share/b218e568fb9b42749cfab86c25388261
 
 The walkthrough covers the full deployment flow from submitting a Git URL to visiting the live app, live log streaming in action, the log drawer with redeploy, and a quick tour of the codebase structure.
 
@@ -121,17 +121,15 @@ All defaults are baked into `docker-compose.yml` so no config files need to be c
 
 ## Brimble Feedback
 
-> Add your Brimble deploy link here.
+> https://pearls-and-grey-concierge.brimble.app/
 
-I deployed a small portfolio page to test the platform. The deployment itself worked without issues. A few things stood out:
+I connected my GitHub account and deployed a portfolio project to test the platform.
 
-The build log experience is solid but there is no clear way to tell whether a deployment failed due to a build error or a runtime crash. Mixing both into the same log stream without labeling them made it harder to debug.
+The connect-with-GitHub flow is smooth and the zero-config build experience is genuinely impressive. Selecting a repo and hitting deploy without writing a single config file is exactly what developers want. The platform picked up my project type automatically and had it running without any intervention from me. The core loop works well.
 
-The UI does not surface the deployed URL prominently enough once a deployment is running. I had to go looking for it. Given that the URL is the whole point of a successful deploy, it should be the first thing you see.
+The most notable issue I ran into was receiving an email notification saying my project was live while the deployment was still in the in-progress state. That kind of premature notification is confusing. It sets an expectation that the app is ready when it is not. If a user follows that link before the deployment finishes, they hit a dead end. The notification should only fire once the deployment is actually serving traffic.
 
-There is no feedback when you submit an invalid repo URL. The deploy just hangs silently for a while before failing. An early validation step on the URL format would save a lot of confusion.
-
-Overall the platform is fast and the DX is clean. The core loop of push-to-deploy works well. The gaps are mostly around error visibility and feedback, which are fixable without touching the core infrastructure.
+If I had to prioritize one fix it would be the notification timing. Getting that wrong erodes trust in the platform faster than almost any other issue, because it is the first thing a new user experiences after a successful deploy.
 
 ---
 
