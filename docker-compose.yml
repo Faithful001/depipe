@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   vault:
     image: hashicorp/vault
@@ -25,24 +23,27 @@ services:
     restart: unless-stopped
     networks:
       - web
+    volumes:
+      - buildkit_cache:/var/lib/buildkit
 
   server:
     build: ./server
     image: depipe-server:latest
     container_name: depipe-server
     ports:
-      - "4000:4000"
+      - "8000:8000"
+      - "5555:5555"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./server/data:/app/data
-      # - depipe_data:/app/data
-      - ./server/repos:/app/repos
+      - depipe_data:/app/data
+      - depipe_repos:/app/repos
     environment:
       - NODE_ENV=production
-      - PORT=4000
+      - PORT=8000
       - BUILDKIT_HOST=docker-container://buildkit
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
+      - REDIS_URL=redis://redis:6379
     group_add:
       - "999"
     networks:
@@ -51,6 +52,7 @@ services:
       - buildkit
       - caddy
       - vault
+      - redis
     restart: unless-stopped
     stop_grace_period: 5s
 
@@ -66,6 +68,17 @@ services:
       - server
     restart: unless-stopped
     stop_grace_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - web
+    restart: unless-stopped
 
   caddy:
     image: caddy:latest
@@ -89,4 +102,7 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
-  # depipe_data:
+  depipe_data:
+  depipe_repos:
+  redis_data:
+  buildkit_cache:

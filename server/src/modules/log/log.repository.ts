@@ -1,23 +1,23 @@
 import db from "../../db/database";
 
 class LogRepository {
-  insert(deploymentId: string, message: string): void {
-    db.prepare(
-      `
-      INSERT INTO logs (deployment_id, message)
-      VALUES (?, ?)
-    `
-    ).run(deploymentId, message);
+  async insert(deploymentId: string, message: string): Promise<void> {
+    await db.log.create({
+      data: {
+        deployment_id: deploymentId,
+        message,
+      },
+    });
   }
 
-  findByDeploymentId(deploymentId: string): { id: number; message: string; created_at: string }[] {
-    return db
-      .prepare(
-        `
-      SELECT * FROM logs WHERE deployment_id = ? ORDER BY id ASC
-    `
-      )
-      .all(deploymentId) as any[];
+  async findByDeploymentId(
+    deploymentId: string
+  ): Promise<{ id: number; message: string; created_at: Date }[]> {
+    const logs = await db.log.findMany({
+      where: { deployment_id: deploymentId },
+      orderBy: { id: "asc" },
+    });
+    return logs;
   }
 }
 

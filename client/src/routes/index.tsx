@@ -12,7 +12,18 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   const [selectedDeployment, setSelectedDeployment] =
     useState<Deployment | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [showForm, setShowForm] = useState(false)
+
+  const openDrawer = (deployment: Deployment) => {
+    setSelectedDeployment(deployment)
+    setIsDrawerOpen(true)
+  }
+
+  const closeDrawer = () => {
+    setIsDrawerOpen(false)
+    setTimeout(() => setSelectedDeployment(null), 300)
+  }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -109,7 +120,7 @@ function HomePage() {
           />
         </div>
 
-        <DeploymentList onViewLogs={setSelectedDeployment} />
+        <DeploymentList onViewLogs={openDrawer} />
       </main>
 
       {/* deploy modal */}
@@ -134,10 +145,13 @@ function HomePage() {
       )}
 
       {/* log drawer */}
-      <LogDrawer
-        deployment={selectedDeployment}
-        onClose={() => setSelectedDeployment(null)}
-      />
+      {selectedDeployment && (
+        <LogDrawer
+          deployment={selectedDeployment}
+          isOpen={isDrawerOpen}
+          onClose={closeDrawer}
+        />
+      )}
     </div>
   )
 }

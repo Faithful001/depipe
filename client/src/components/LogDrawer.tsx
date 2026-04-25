@@ -1,18 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLogs } from '../hooks/useLogs'
-import { useDeploy } from '../hooks/useDeployments'
+import {
+  useCancelDeployment,
+  useDeploy,
+  useDeployment,
+} from '../hooks/useDeployments'
 import type { Deployment } from '../types'
 
 interface LogDrawerProps {
   deployment: Deployment | null
+  isOpen: boolean
   onClose: () => void
 }
 
-export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
-  const logs = useLogs(deployment?.id ?? null)
+export function LogDrawer({
+  deployment: initialDeployment,
+  isOpen,
+  onClose,
+}: LogDrawerProps) {
+  const { data: fetchedDeployment } = useDeployment(initialDeployment?.id ?? '')
+  const deployment = fetchedDeployment ?? initialDeployment
+
+  const { logs, liveStatus, time } = useLogs(
+    isOpen ? (deployment?.id ?? null) : null,
+  )
+  const currentStatus = liveStatus ?? deployment?.status ?? 'pending'
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const { mutate: deploy, isPending } = useDeploy()
+
+  const { mutate: cancel, isPending: isPendingCancel } = useCancelDeployment()
 
   useEffect(() => {
     if (autoScroll) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -27,11 +45,16 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
   }, [onClose])
 
   const handleRedeploy = () => {
-    if (!deployment?.git_url || !deployment?.env) return
+    if (!deployment?.git_url) return
     deploy({
       gitUrl: deployment.git_url,
-      env: deployment.env,
+      env: deployment.env ?? undefined,
     })
+  }
+
+  const handleCancel = () => {
+    if (!deployment?.id) return
+    cancel(deployment.id)
   }
 
   const cfg = {
@@ -41,7 +64,17 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
     pending: '#eab308',
     failed: '#ef4444',
   }
-  const dotColor = cfg[deployment?.status as keyof typeof cfg] ?? '#71717a'
+  const dotColor = cfg[currentStatus as keyof typeof cfg] ?? '#71717a'
+
+  function formatDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+
+    if (h > 0) return `${h}h ${m}m ${s}s`
+    if (m > 0) return `${m}m ${s}s`
+    return `${s}s`
+  }
 
   return (
     <>
@@ -54,8 +87,8 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
           background: 'rgba(0,0,0,0.5)',
           backdropFilter: 'blur(2px)',
           zIndex: 40,
-          opacity: deployment ? 1 : 0,
-          pointerEvents: deployment ? 'auto' : 'none',
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
           transition: 'opacity 0.2s',
         }}
       />
@@ -71,7 +104,7 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
           background: 'var(--surface)',
           borderTop: '1px solid var(--border)',
           zIndex: 50,
-          transform: deployment ? 'translateY(0)' : 'translateY(100%)',
+          transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex',
           flexDirection: 'column',
@@ -122,8 +155,20 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
               letterSpacing: '0.04em',
             }}
           >
-            {deployment?.status}
+            {currentStatus}
           </span>
+
+          {currentStatus !== 'running' && currentStatus !== 'failed' && (
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                fontFamily: 'IBM Plex Mono, monospace',
+              }}
+            >
+              {formatDuration(time)}
+            </span>
+          )}
 
           {deployment?.url && (
             <a
@@ -143,6 +188,27 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
 
           <div style={{ flex: 1 }} />
 
+          {currentStatus !== 'running' && currentStatus !== 'failed' && (
+            <button
+              onClick={handleCancel}
+              disabled={isPendingCancel}
+              style={{
+                background: 'var(--red)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                padding: '4px 10px',
+                fontSize: 11,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                opacity: isPending ? 0.5 : 1,
+                fontFamily: 'IBM Plex Sans, sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              {isPendingCancel ? 'cancelling...' : 'cancel'}
+            </button>
+          )}
+
           {/* auto scroll toggle */}
           <button
             onClick={() => setAutoScroll((p) => !p)}
@@ -160,7 +226,7 @@ export function LogDrawer({ deployment, onClose }: LogDrawerProps) {
             auto-scroll
           </button>
 
-          {deployment?.status === 'failed' && (
+          {currentStatus === 'failed' && (
             <button
               onClick={handleRedeploy}
               disabled={isPending}

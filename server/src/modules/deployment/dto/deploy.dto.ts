@@ -10,7 +10,7 @@ export const zipDeploySchema = z.object({
     .string()
     .min(1, "Image name is required")
     .regex(/^[a-z0-9-]+$/, "Image name must be lowercase letters, numbers and hyphens only"),
-  env: z.string().optional(), // JSON string since FormData sends strings
+  env: z.string().optional(),
 });
 
 export type DeployInput = z.infer<typeof deploySchema>;

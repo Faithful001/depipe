@@ -1,47 +1,56 @@
+import { api } from '.'
 import type { Deployment, Log } from '../types'
-
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
 export const deploymentsApi = {
   async getAll(): Promise<Deployment[]> {
-    const res = await fetch(`${BASE_URL}/deployments`)
-    const data = await res.json()
-    return data.deployments
+    const res = await api.get('/deployments')
+    return res.data.data.deployments
   },
 
   async deploy(payload: {
     gitUrl: string
     env?: Record<string, string>
   }): Promise<{ containerId: string }> {
-    const res = await fetch(`${BASE_URL}/deployments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.message)
+    try {
+      const res = await api.post('/deployments', payload)
+      return res.data
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Deployment failed')
     }
-    return res.json()
+  },
+
+  async cancel(deploymentId: string): Promise<void> {
+    try {
+      const res = await api.post(`/deployments/${deploymentId}/cancel`)
+      return res.data
+    } catch (err: any) {
+      throw new Error(
+        err.response?.data?.message || 'Failed to cancel deployment',
+      )
+    }
+  },
+
+  async getById(deploymentId: string): Promise<Deployment> {
+    const res = await api.get(`/deployments/${deploymentId}`)
+    return res.data.data.deployment
   },
 
   async getLogs(deploymentId: string): Promise<Log[]> {
-    const res = await fetch(`${BASE_URL}/deployments/${deploymentId}/logs`)
-    const data = await res.json()
-    return data.logs
+    const res = await api.get(`/deployments/${deploymentId}/logs`)
+    return res.data.data.logs
   },
 
   async deployZip(formData: FormData): Promise<{ containerId: string }> {
-    const res = await fetch(`${BASE_URL}/deployments/zip`, {
-      method: 'POST',
-      body: formData, // no Content-Type header — browser sets it with boundary
-    })
-    if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.message)
+    try {
+      const res = await api.post('/deployments/zip', formData, {
+        headers: {
+          // IMPORTANT: let axios set the boundary automatically
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      return res.data
+    } catch (err: any) {
+      throw new Error(err.response?.data?.message || 'Zip deployment failed')
     }
-    return res.json()
   },
 }

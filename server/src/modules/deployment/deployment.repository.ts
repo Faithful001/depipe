@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import db from "../../db/database";
 
 export type DeploymentStatus = "pending" | "building" | "deploying" | "running" | "failed";
@@ -8,15 +7,14 @@ export interface Deployment {
   image: string;
   git_url: string | null;
   container_port: number | null;
-  env: string | null;
-  status: DeploymentStatus;
+  status: DeploymentStatus; // DeploymentStatus
   container_id: string | null;
   host_port: number | null;
-  created_at: string;
+  created_at: Date;
 }
 
 class DeploymentRepository {
-  create({
+  async create({
     image,
     status,
     git_url,
@@ -26,61 +24,84 @@ class DeploymentRepository {
     status?: DeploymentStatus;
     git_url?: string | null;
     container_port?: number;
-  }): Deployment {
-    const id = randomUUID();
-    db.prepare(
-      `
-    INSERT INTO deployments (id, image, status, git_url, container_port)
-    VALUES (?, ?, ?, ?, ?)
-  `
-    ).run(id, image, status ?? "pending", git_url, container_port);
+  }): Promise<Deployment> {
+    const deployment = await db.deployment.create({
+      data: {
+        image,
+        status: status ?? "pending",
+        git_url: git_url ?? null,
+        container_port: container_port ?? null,
+      },
+    });
 
-    return this.findById(id)!;
+    return deployment as Deployment;
   }
 
-  findById(id: string): Deployment | null {
-    return (db.prepare(`SELECT * FROM deployments WHERE id = ?`).get(id) as Deployment) ?? null;
+  async findById(id: string): Promise<Deployment | null> {
+    const deployment = await db.deployment.findUnique({
+      where: { id },
+    });
+    return deployment as Deployment | null;
   }
 
-  findByStatus(status: DeploymentStatus): Deployment[] {
-    return (
-      (db.prepare(`SELECT * FROM deployments WHERE status = ?`).all(status) as Deployment[]) ?? []
-    );
+  async findByStatus(status: DeploymentStatus): Promise<Deployment[]> {
+    const deployments = await db.deployment.findMany({
+      where: { status },
+    });
+    return deployments as Deployment[];
   }
 
-  findByImage(image: string): Deployment[] {
-    return (
-      (db
-        .prepare(`SELECT * FROM deployments WHERE image = ? ORDER BY created_at DESC`)
-        .all(image) as Deployment[]) ?? []
-    );
+  async findByImage(image: string): Promise<Deployment[]> {
+    const deployments = await db.deployment.findMany({
+      where: { image },
+      orderBy: { created_at: "desc" },
+    });
+    return deployments as Deployment[];
   }
 
-  findAll(): Deployment[] {
-    return db.prepare(`SELECT * FROM deployments ORDER BY created_at DESC`).all() as Deployment[];
+  async findAll(): Promise<Deployment[]> {
+    const deployments = await db.deployment.findMany({
+      orderBy: { created_at: "desc" },
+    });
+    return deployments as Deployment[];
   }
 
-  update(id: string, data: Array<keyof Omit<Deployment, "id" | "created_at" | "image">>): void {
-    const updateClause = data.map((key) => `${key} = ?`).join(", ");
-    const query = `UPDATE deployments SET ${updateClause} WHERE id = ?`;
-    const params = [...data, id];
-    db.prepare(query).run(params);
+  async update(
+    id: string,
+    data: Partial<Omit<Deployment, "id" | "created_at" | "image">>
+  ): Promise<void> {
+    await db.deployment.update({
+      where: { id },
+      data,
+    });
   }
 
-  updateStatus(id: string, status: DeploymentStatus): void {
-    db.prepare(`UPDATE deployments SET status = ? WHERE id = ?`).run(status, id);
+  async updateStatus(id: string, status: DeploymentStatus): Promise<void> {
+    await db.deployment.update({
+      where: { id },
+      data: { status },
+    });
   }
 
-  updateContainerId(id: string, containerId: string): void {
-    db.prepare(`UPDATE deployments SET container_id = ? WHERE id = ?`).run(containerId, id);
+  async updateContainerId(id: string, containerId: string): Promise<void> {
+    await db.deployment.update({
+      where: { id },
+      data: { container_id: containerId },
+    });
   }
 
-  updateHostPort(id: string, hostPort: number): void {
-    db.prepare(`UPDATE deployments SET host_port = ? WHERE id = ?`).run(hostPort, id);
+  async updateHostPort(id: string, hostPort: number): Promise<void> {
+    await db.deployment.update({
+      where: { id },
+      data: { host_port: hostPort },
+    });
   }
 
-  updateContainerPort(id: string, containerPort: number): void {
-    db.prepare(`UPDATE deployments SET container_port = ? WHERE id = ?`).run(containerPort, id);
+  async updateContainerPort(id: string, containerPort: number): Promise<void> {
+    await db.deployment.update({
+      where: { id },
+      data: { container_port: containerPort },
+    });
   }
 }
 

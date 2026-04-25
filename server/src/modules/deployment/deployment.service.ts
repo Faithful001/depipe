@@ -7,29 +7,98 @@ import simpleGit from "simple-git";
 import path from "node:path";
 import fs from "node:fs";
 import { vaultService } from "../../core/vault";
+import {
+  clearCancellation,
+  deploymentQueue,
+  isCancelled,
+  markForCancellation,
+} from "../../core/jobs/deployment.queue";
 
 class DeploymentService {
   async deploy(
     source: { type: "git"; gitUrl: string } | { type: "zip"; zipPath: string; imageName: string },
     env?: Record<string, string>
-  ): Promise<string | null> {
+  ): Promise<{ id: string }> {
     const image =
       source.type === "git" ? source.gitUrl.split("/").pop()!.split(".")[0] : source.imageName;
 
-    const sameImageHostPort = deploymentRepository.findByImage(image)?.[0]?.host_port;
-
-    console.log("sameImageHostPort", sameImageHostPort);
-
-    const hostPort = sameImageHostPort || portRepository.allocatePort();
-
-    console.log("hostPort", hostPort);
-
-    const deployment = deploymentRepository.create({
+    const deployment = await deploymentRepository.create({
       image,
       status: "pending",
       git_url: source.type === "git" ? source.gitUrl : null,
     });
-    sse.emit(deployment.id, "pending");
+
+    sse.emitStatus(deployment.id, "pending");
+
+    // add job to BullMQ queue
+    await deploymentQueue.add(
+      "deploy",
+      { deploymentId: deployment.id, source, env },
+      {
+        jobId: deployment.id,
+        attempts: 1,
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      }
+    );
+
+    return { id: deployment.id };
+  }
+
+  async cancelDeployment(deploymentId: string) {
+    try {
+      const job = await deploymentQueue.getJob(deploymentId);
+
+      if (job) {
+        const state = await job.getState();
+
+        if (state === "waiting" || state === "delayed") {
+          // job hasn't started yet — safe to remove
+          await job.remove();
+        } else if (state === "active") {
+          // job is running — mark for cancellation
+          markForCancellation(deploymentId);
+        }
+      }
+
+      await deploymentRepository.updateStatus(deploymentId, "failed");
+
+      const deployment = await deploymentRepository.findById(deploymentId);
+      if (deployment?.container_id) {
+        await this.runCommand("docker", ["stop", deployment.container_id], "", deploymentId);
+        await this.runCommand("docker", ["rm", deployment.container_id], "", deploymentId);
+      }
+
+      if (deployment?.host_port) {
+        await portRepository.releasePort(deployment.host_port);
+      }
+
+      sse.emitStatus(deploymentId, "failed");
+      this.log("Deployment cancelled", deploymentId);
+    } catch (error) {
+      this.log("Failed to cancel deployment", deploymentId);
+      console.error(error);
+    }
+  }
+
+  public async executeDeployment(
+    deployment: any,
+    source: { type: "git"; gitUrl: string } | { type: "zip"; zipPath: string; imageName: string },
+    env?: Record<string, string>
+  ): Promise<string | null> {
+    let time = 0;
+
+    const interval = setInterval(() => {
+      time += 1;
+      sse.emitTime(deployment.id, time);
+    }, 1000);
+
+    const image = deployment.image;
+    const sameImageHostPort = (await deploymentRepository.findByImage(image)).filter(
+      (d) => d.id !== deployment.id && d.status === "running"
+    )?.[0]?.host_port;
+
+    const hostPort = sameImageHostPort || (await portRepository.allocatePort());
 
     try {
       if (env && Object.keys(env).length > 0) {
@@ -37,7 +106,12 @@ class DeploymentService {
         this.log("Environment variables stored in Vault", deployment.id);
       }
 
-      // get source code
+      // check before clone
+      if (isCancelled(deployment.id)) {
+        clearCancellation(deployment.id);
+        throw new Error("Deployment already cancelled");
+      }
+
       let src: string;
       if (source.type === "git") {
         src = await this.cloneRepo(source.gitUrl, image, deployment.id);
@@ -45,22 +119,32 @@ class DeploymentService {
         src = await this.extractUpload(source.zipPath, image, deployment.id);
       }
 
-      // building
-      deploymentRepository.updateStatus(deployment.id, "building");
-      sse.emit(deployment.id, "building");
-      const containerPort = await this.buildImage(src, image, deployment.id);
-      deploymentRepository.updateContainerPort(deployment.id, containerPort);
+      // check before build
+      if (isCancelled(deployment.id)) {
+        clearCancellation(deployment.id);
+        throw new Error("Deployment already cancelled");
+      }
 
-      // deploying
-      deploymentRepository.updateStatus(deployment.id, "deploying");
-      sse.emit(deployment.id, "deploying");
+      await deploymentRepository.updateStatus(deployment.id, "building");
+      sse.emitStatus(deployment.id, "building");
+
+      const containerPort = await this.buildImage(src, image, deployment.id);
+      await deploymentRepository.updateContainerPort(deployment.id, containerPort);
+
+      // check before deploy
+      if (isCancelled(deployment.id)) {
+        clearCancellation(deployment.id);
+        throw new Error("Deployment already cancelled");
+      }
+
+      await deploymentRepository.updateStatus(deployment.id, "deploying");
+      sse.emitStatus(deployment.id, "deploying");
 
       const storedEnv = env ? await vaultService.getEnv(deployment.id) : undefined;
 
-      // stop old running containers for this image
-      const oldDeployments = deploymentRepository
-        .findByImage(image)
-        .filter((d) => d.id !== deployment.id && d.status === "running");
+      const oldDeployments = (await deploymentRepository.findByImage(image)).filter(
+        (d) => d.id !== deployment.id && d.status === "running"
+      );
 
       for (const old of oldDeployments) {
         if (old.container_id) {
@@ -71,12 +155,13 @@ class DeploymentService {
             );
             await this.runCommand("docker", ["stop", old.container_id], src, deployment.id);
             await this.runCommand("docker", ["rm", old.container_id], src, deployment.id);
-            // only release port if we aren't reusing it for the new container
             if (old.host_port && old.host_port !== hostPort) {
-              portRepository.releasePort(old.host_port);
+              await portRepository.releasePort(old.host_port);
             }
-          } catch {
-            console.log(`Failed to cleanup old container ${old.container_id}`);
+          } catch (err: unknown) {
+            if (!sameImageHostPort) {
+              await portRepository.releasePort(hostPort);
+            }
           }
         }
       }
@@ -90,20 +175,21 @@ class DeploymentService {
         env: storedEnv,
       });
 
-      deploymentRepository.updateContainerId(deployment.id, containerId);
-      deploymentRepository.updateHostPort(deployment.id, hostPort);
-      deploymentRepository.updateStatus(deployment.id, "running");
-      sse.emit(deployment.id, "running");
+      await deploymentRepository.updateContainerId(deployment.id, containerId);
+      await deploymentRepository.updateHostPort(deployment.id, hostPort);
+      await deploymentRepository.updateStatus(deployment.id, "running");
+      sse.emitStatus(deployment.id, "running");
 
       await this.reloadCaddy();
       return containerId;
     } catch (err: unknown) {
       const error = err as Error;
-      console.error(error.message);
-      portRepository.releasePort(hostPort);
-      deploymentRepository.updateStatus(deployment.id, "failed");
-      sse.emit(deployment.id, "failed");
+      if (!sameImageHostPort) {
+        await portRepository.releasePort(hostPort);
+      }
       throw error;
+    } finally {
+      clearInterval(interval);
     }
   }
 
@@ -145,7 +231,7 @@ class DeploymentService {
 
     this.log("Extraction complete", deploymentId);
 
-    // handle nested folder — if zip extracts to a single subfolder, use that
+    // handle nested folder. if zip extracts to a single subfolder, use that
     const entries = fs.readdirSync(extractDir);
     if (entries.length === 1) {
       const nested = path.join(extractDir, entries[0]);
@@ -201,7 +287,7 @@ class DeploymentService {
   }
 
   public async reloadCaddy(): Promise<void> {
-    const runningDeployments = deploymentRepository.findByStatus("running");
+    const runningDeployments = await deploymentRepository.findByStatus("running");
 
     const routes = runningDeployments.map((deployment) => ({
       match: [{ host: [`${deployment.image}.localhost`] }],
@@ -245,13 +331,14 @@ class DeploymentService {
   }
 
   private async buildImage(src: string, image: string, deploymentId: string): Promise<number> {
+    this.log(`Building from: ${src}`, deploymentId);
     try {
       this.log(`Analysing project...`, deploymentId);
 
       // generate build plan to detect port
       await this.runCommand(
         "railpack",
-        ["prepare", ".", "--plan-out", "railpack-plan.json", "--hide-pretty-plan"],
+        ["prepare", src, "--plan-out", "railpack-plan.json", "--hide-pretty-plan"],
         src,
         deploymentId
       );
@@ -271,8 +358,11 @@ class DeploymentService {
         }
       }
 
+      this.log(`cwd check: ${src}`, deploymentId);
+      this.log(`exists: ${fs.existsSync(src)}`, deploymentId);
+      this.log(`contents: ${fs.readdirSync(src).join(", ")}`, deploymentId);
       this.log(`Building image ${image}...`, deploymentId);
-      await this.runCommand("railpack", ["build", ".", "--name", image], src, deploymentId);
+      await this.runCommand("railpack", ["build", src, "--name", image], src, deploymentId, true);
       this.log("Build complete", deploymentId);
 
       return containerPort;
@@ -310,30 +400,33 @@ class DeploymentService {
     command: string,
     args: string[],
     dir: string,
-    deploymentId: string
+    deploymentId: string,
+    useBuildKit: boolean = false
   ): Promise<string> {
+    console.log(`runCommand: ${command} ${args.join(" ")} in ${dir}`);
     return new Promise((resolve, reject) => {
       const spawnProcess = spawn(command, args, {
         cwd: dir || undefined,
-        env: {
-          ...process.env,
-          BUILDKIT_HOST: process.env.BUILDKIT_HOST,
-        },
+        env: (() => {
+          const { BUILDKIT_HOST, ...rest } = process.env;
+          return useBuildKit && BUILDKIT_HOST ? { ...rest, BUILDKIT_HOST } : rest;
+        })(),
       });
+
+      console.log(`spawning: ${command} ${args.join(" ")}`);
+      console.log(`cwd: ${dir}`);
 
       let output = "";
 
       spawnProcess.stdout.on("data", (data: Buffer) => {
         const message = data.toString();
         output += message;
-        logRepository.insert(deploymentId, message);
-        sse.emit(deploymentId, message);
+        this.log(message, deploymentId);
       });
 
       spawnProcess.stderr.on("data", (data: Buffer) => {
         const message = data.toString();
-        logRepository.insert(deploymentId, message);
-        sse.emit(deploymentId, message);
+        this.log(message, deploymentId);
       });
 
       spawnProcess.on("close", (code) => {
@@ -351,8 +444,9 @@ class DeploymentService {
   }
 
   private log(message: string, deploymentId: string): void {
-    logRepository.insert(deploymentId, message);
+    logRepository.insert(deploymentId, message).catch(console.error);
     sse.emit(deploymentId, message);
+    console.log(`[${deploymentId}] ${message}`);
   }
 }
 

@@ -25,15 +25,15 @@ COPY package*.json .
 
 RUN npm ci
 
-# rebuild native modules for Linux separately
-RUN npm rebuild better-sqlite3
-
 COPY . .
+
+# generate prisma client
+RUN npx prisma generate
 
 RUN npm run build
 
-EXPOSE 4000
+EXPOSE 8000
 
 STOPSIGNAL SIGTERM
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "DATABASE_URL=\"file:/app/data/depipe.db\" npx prisma db push --accept-data-loss && npm start"]
