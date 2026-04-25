@@ -16,9 +16,9 @@ class PortRepository {
     const nextPort = maxPort !== null ? maxPort + 1 : START_PORT;
     console.log("next port", nextPort);
 
-    if (nextPort > END_PORT) {
-      throw new Error("No available ports");
-    }
+    // if (nextPort > END_PORT) {
+    //   throw new Error("No available ports");
+    // }
 
     await db.port.create({
       data: { port: nextPort },

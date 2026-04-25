@@ -19,3 +19,17 @@ export function createDeploymentWorker(processor: (job: Job<DeploymentJobData>) 
     concurrency: 1,
   });
 }
+
+export const cancelledJobs = new Set<string>();
+
+export function markForCancellation(deploymentId: string) {
+  cancelledJobs.add(deploymentId);
+}
+
+export function isCancelled(deploymentId: string) {
+  return cancelledJobs.has(deploymentId);
+}
+
+export function clearCancellation(deploymentId: string) {
+  cancelledJobs.delete(deploymentId);
+}

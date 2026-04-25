@@ -16,7 +16,7 @@ A single-page deployment pipeline that takes a Git URL or a zipped project and t
 
 ## Loom Walkthrough
 
-> https://www.loom.com
+> Add your Loom link here once recorded.
 
 The walkthrough covers the full deployment flow from submitting a Git URL to visiting the live app, live log streaming in action, the log drawer with redeploy, and a quick tour of the codebase structure.
 
@@ -92,6 +92,8 @@ Browser
 
 **SSE with typed events.** The event stream sends two event types: `log` for build output and `status` for pipeline state changes. The frontend handles them separately so the status badge updates in real time without polling the deployments endpoint.
 
+**Single concurrency on the worker.** The BullMQ worker is set to `concurrency: 1`, meaning only one deployment runs at a time. Railpack builds are CPU and memory intensive — running multiple simultaneously on a single machine would cause them to starve each other of resources and slow everything down. In production you would tune this number based on the available hardware per node, or distribute work across multiple machines each running their own worker.
+
 ## Environment Variables
 
 All defaults are baked into `docker-compose.yml` so no config files need to be created to run the project.
@@ -119,7 +121,7 @@ All defaults are baked into `docker-compose.yml` so no config files need to be c
 
 ## Brimble Feedback
 
-> https://brimble.com
+> Add your Brimble deploy link here.
 
 I deployed a small portfolio page to test the platform. The deployment itself worked without issues. A few things stood out:
 

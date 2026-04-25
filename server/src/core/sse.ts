@@ -24,22 +24,27 @@ class SSE {
     });
   }
 
-  emit(deploymentId: string, data: string) {
+  private write(deploymentId: string, data: object) {
     const clients = this.channels.get(deploymentId);
     if (clients) {
       for (const client of clients) {
-        client.write(`data: ${JSON.stringify({ type: "log", message: data })}\n\n`);
+        client.write(`data: ${JSON.stringify(data)}\n\n`);
       }
     }
   }
 
+  emit(deploymentId: string, message: string) {
+    this.write(deploymentId, { type: "log", message });
+  }
+
+  emitTime(deploymentId: string, time: number) {
+    this.write(deploymentId, { type: "time", time });
+  }
+
   emitStatus(deploymentId: string, status: string) {
-    const clients = this.channels.get(deploymentId);
-    if (clients) {
-      for (const client of clients) {
-        client.write(`data: ${JSON.stringify({ type: "status", status })}\n\n`);
-      }
-    }
+    this.write(deploymentId, { type: "status", status });
+    // also broadcast to global channel with deploymentId included
+    this.write("all", { type: "status", deploymentId, status });
   }
 }
 

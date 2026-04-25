@@ -72,6 +72,22 @@ class DeploymentController {
     }
   }
 
+  async cancelDeployment(req: Request, res: Response) {
+    try {
+      const { deploymentId } = req.params;
+      await deploymentService.cancelDeployment(deploymentId as string);
+
+      return res.status(200).json({
+        success: true,
+        message: "Deployment cancelled",
+        data: null,
+      });
+    } catch (error: unknown) {
+      const err = error as Error;
+      return res.status(500).json({ success: false, message: err.message, data: null });
+    }
+  }
+
   async getAll(req: Request, res: Response) {
     try {
       const deployments = await deploymentRepository.findAll();
@@ -115,6 +131,7 @@ class DeploymentController {
   }
 
   async getLogs(req: Request, res: Response) {
+    res.setHeader("Cache-Control", "no-store");
     try {
       const { deploymentId } = req.params;
       const deployment = await deploymentRepository.findById(deploymentId as string);

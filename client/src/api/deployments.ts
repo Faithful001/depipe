@@ -19,6 +19,17 @@ export const deploymentsApi = {
     }
   },
 
+  async cancel(deploymentId: string): Promise<void> {
+    try {
+      const res = await api.post(`/deployments/${deploymentId}/cancel`)
+      return res.data
+    } catch (err: any) {
+      throw new Error(
+        err.response?.data?.message || 'Failed to cancel deployment',
+      )
+    }
+  },
+
   async getById(deploymentId: string): Promise<Deployment> {
     const res = await api.get(`/deployments/${deploymentId}`)
     return res.data.data.deployment

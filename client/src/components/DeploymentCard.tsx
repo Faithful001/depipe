@@ -1,4 +1,5 @@
-import { useLogs } from '#/hooks/useLogs'
+import { useDeploymentStatus } from '#/hooks/useDeploymentStatus'
+// import { useLogs } from '#/hooks/useLogs'
 import type { Deployment, DeploymentStatus } from '../types'
 
 const statusConfig: Record<
@@ -21,8 +22,7 @@ export function DeploymentCard({
   deployment,
   onViewLogs,
 }: DeploymentCardProps) {
-  const { liveStatus } = useLogs(deployment?.id ?? null)
-  const currentStatus = liveStatus ?? deployment?.status ?? 'pending'
+  const currentStatus = useDeploymentStatus(deployment.id, deployment.status)
 
   const cfg =
     statusConfig[currentStatus as keyof typeof statusConfig] ??
