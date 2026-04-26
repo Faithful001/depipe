@@ -6,8 +6,7 @@ A single-page deployment pipeline that takes a Git URL or a zipped project and t
 
 - [x] Public GitHub repo
 - [x] `docker-compose.yml` that brings up the full stack on a clean machine
-- [x] README with setup instructions, architecture notes, and design decisions
-- [x] Sample container app included (`/sample-app`)
+- [x] README with setup instructions, architecture notes, and design
 - [x] Live log streaming over SSE
 - [x] Railpack builds produce runnable images
 - [x] Caddy fronts every deployment with hostname-based routing
@@ -32,7 +31,7 @@ docker compose up --build
 
 Open `http://localhost:3000` in your browser. Chrome or Firefox works best for `*.localhost` subdomain resolution.
 
-To test the pipeline, use any public GitHub repo or compress a project to a `.zip` and upload it directly. A sample app is included in `/sample-app` for convenience.
+To test the pipeline, use any public GitHub repo or compress a project to a `.zip` and upload it directly.
 
 ## System Design
 
