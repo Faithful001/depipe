@@ -74,7 +74,7 @@ Browser
 | Backend  | Node.js + TypeScript + Express + Prisma + SQLite               |
 | Pipeline | Railpack + Docker + BuildKit                                   |
 | Ingress  | Caddy (dynamically configured via Admin API)                   |
-| Secrets  | HashiCorp Vault (dev mode)                                     |
+| Secrets  | HashiCorp Vault                                                |
 | Queue    | BullMQ + Redis                                                 |
 
 ## Key Design Decisions
