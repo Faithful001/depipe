@@ -79,7 +79,7 @@ Browser
 
 ## Key Design Decisions
 
-**BullMQ + Redis for the deployment queue.** An in-memory queue would have worked for this task, but a real PaaS does not run on a single process. Deployments need to survive server restarts, scale across workers, and recover from crashes — that requires a durable queue. BullMQ with Redis is the natural fit and reflects how this would actually be built in production. The cost is one extra container.
+**BullMQ + Redis for the deployment queue.** An in-memory queue would have worked for this task, but a real PaaS does not run on a single process. Deployments need to survive server restarts, scale across workers, and recover from crashes, and that requires a durable queue. BullMQ with Redis is the natural fit and reflects how this would actually be built in production. The cost is one extra container.
 
 **Queue-based deployments.** The `POST /api/deployments` endpoint adds the job to the BullMQ queue and returns immediately with the deployment ID. The pipeline runs in the background via a dedicated worker. This keeps the API responsive, prevents long-running builds from blocking the event loop, and means the client can start streaming logs right away without waiting for the build to finish.
 
@@ -91,9 +91,9 @@ Browser
 
 **SSE with typed events.** The event stream sends two event types: `log` for build output and `status` for pipeline state changes. The frontend handles them separately so the status badge updates in real time without polling the deployments endpoint.
 
-**Single concurrency on the worker.** The BullMQ worker is set to `concurrency: 1`, meaning only one deployment runs at a time. Railpack builds are CPU and memory intensive — running multiple simultaneously on a single machine would cause them to starve each other of resources and slow everything down. In production you would tune this number based on the available hardware per node, or distribute work across multiple machines each running their own worker.
+**Single concurrency on the worker.** The BullMQ worker is set to concurrency: 1, meaning only one deployment runs at a time. Railpack builds are CPU and memory intensive, and running multiple simultaneously on a single machine would cause them to starve each other of resources and slow everything down. In production you would tune this number based on the available hardware per node, or distribute work across multiple machines each running their own worker.
 
-**Persistent build cache via BuildKit.** Railpack builds through a dedicated BuildKit container mounted with a named volume so the layer cache survives restarts. The first build of a project is slow — base images and dependencies download from scratch. Every build after that reuses cached layers and completes significantly faster.
+**Persistent build cache via BuildKit.** Railpack builds through a dedicated BuildKit container mounted with a named volume so the layer cache survives restarts. The first build of a project is slow because base images and dependencies download from scratch. Every build after that reuses cached layers and completes significantly faster.
 
 ## Environment Variables
 
@@ -122,7 +122,7 @@ All defaults are baked into `docker-compose.yml` so no config files need to be c
 
 > https://pearls-and-grey-concierge.brimble.app/
 
-I connected my GitHub account and deployed a portfolio project to test the platform.
+I connected my GitHub account and deployed a landing page to test the platform.
 
 The connect-with-GitHub flow is smooth and the zero-config build experience is genuinely impressive. Selecting a repo and hitting deploy without writing a single config file is exactly what developers want. The platform picked up my project type automatically and had it running without any intervention from me. The core loop works well.
 
