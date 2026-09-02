@@ -1,6 +1,6 @@
 # Depipe
 
-Depipe is an end-to-end deployment platform: Git URL or ZIP in, zero-config Railpack build, containerized runtime, and dynamic Caddy routing out, with live log streaming over SSE the whole way through.
+Depipe is an end-to-end deployment platform: Git URL or ZIP in, zero-config Railpack build, containerized runtime, and dynamic Caddy routing out, with live log streaming over SSE.
 
 ## Demo
 
