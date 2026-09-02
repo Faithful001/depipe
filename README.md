@@ -1,19 +1,8 @@
 # Depipe
 
-A single-page deployment pipeline that takes a Git URL or a zipped project and turns it into a running, publicly accessible container. Built for the Brimble engineering take-home task.
+Depipe is an end-to-end deployment platform: Git URL or ZIP in, zero-config Railpack build, containerized runtime, and dynamic Caddy routing out, with live log streaming over SSE the whole way through.
 
-## Submission Checklist
-
-- [x] Public GitHub repo
-- [x] `docker-compose.yml` that brings up the full stack on a clean machine
-- [x] README with setup instructions, architecture notes, and design
-- [x] Live log streaming over SSE
-- [x] Railpack builds produce runnable images
-- [x] Caddy fronts every deployment with hostname-based routing
-- [x] Loom walkthrough
-- [x] Brimble deploy + written feedback
-
-## Loom Walkthrough
+## Demo
 
 > https://www.loom.com/share/b218e568fb9b42749cfab86c25388261
 
@@ -44,16 +33,63 @@ The full system design diagram is available here:
 At a high level, the flow looks like this:
 
 ```
-Browser
-  -> Vite + TanStack frontend         :3000
-    -> Express API                    :4000
-      -> Deployment queue             (returns early, runs pipeline in background)
-        -> Git clone or ZIP extract   (source lands in /repos/<image>)
-          -> railpack prepare         (detects framework + port from build plan)
-            -> railpack build         (produces Docker image via BuildKit)
-              -> docker run           (container starts on allocated port 4001-5000)
-                -> Caddy Admin API    (routes <image>.localhost to container)
-                  -> SSE              (streams status + logs to browser in real time)
+┌────────────────────────────────────────┐
+│                Browser                 │
+└────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────┐
+│        Vite + TanStack frontend        │
+│                 :3000                  │
+└────────────────────────────────────────┘
+                    │
+              HTTP request
+                    ▼
+┌────────────────────────────────────────┐
+│              Express API               │
+│                 :4000                  │
+└────────────────────────────────────────┘
+                    │
+          POST /api/deployments
+                    ▼
+┌────────────────────────────────────────┐
+│       Deployment queue (BullMQ)        │
+│            backed by Redis             │
+└────────────────────────────────────────┘
+                    │
+    job enqueued, returns immediately
+                    ▼
+┌────────────────────────────────────────┐
+│        Git clone or ZIP extract        │
+│     source lands in /repos/<image>     │
+└────────────────────────────────────────┘
+                    │
+      background worker picks up job
+                    ▼
+┌────────────────────────────────────────┐
+│            railpack prepare            │
+│        detects framework + port        │
+└────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────┐
+│             railpack build             │
+│   produces Docker image via BuildKit   │
+└────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────┐
+│               docker run               │
+│      container on port 4001-5000       │
+└────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────┐
+│            Caddy Admin API             │
+│  routes <image>.localhost to container │
+└────────────────────────────────────────┘
+                    │
+SSE: status + logs stream back to the browser
 ```
 
 ## What It Does
@@ -79,7 +115,7 @@ Browser
 
 ## Key Design Decisions
 
-**BullMQ + Redis for the deployment queue.** An in-memory queue would have worked for this task, but a real PaaS does not run on a single process. Deployments need to survive server restarts, scale across workers, and recover from crashes, and that requires a durable queue. BullMQ with Redis is the natural fit and reflects how this would actually be built in production. The cost is one extra container.
+**BullMQ + Redis for the deployment queue.** An in-memory queue would have worked for a small demo, but a real PaaS does not run on a single process. Deployments need to survive server restarts, scale across workers, and recover from crashes, and that requires a durable queue. BullMQ with Redis is the natural fit and reflects how this would actually be built in production. The cost is one extra container.
 
 **Queue-based deployments.** The `POST /api/deployments` endpoint adds the job to the BullMQ queue and returns immediately with the deployment ID. The pipeline runs in the background via a dedicated worker. This keeps the API responsive, prevents long-running builds from blocking the event loop, and means the client can start streaming logs right away without waiting for the build to finish.
 
@@ -108,7 +144,7 @@ All defaults are baked into `docker-compose.yml` so no config files need to be c
 | `VITE_API_URL`  | `http://localhost:4000/api`   | API base URL for the frontend    |
 | `REDIS_URL`     | `redis://redis:6379`          | Redis connection URL for BullMQ  |
 
-## What I Would Do With More Time
+## Roadmap
 
 **Zero-downtime redeploys.** Currently the old container is stopped before the new one starts. A proper blue-green swap would start the new container, wait for a health check to pass, switch the Caddy upstream, and then stop the old one. The current approach works but drops in-flight requests during the swap window.
 
@@ -117,19 +153,3 @@ All defaults are baked into `docker-compose.yml` so no config files need to be c
 **WebSocket upgrade.** SSE is one-way. Upgrading to WebSockets would open the door for interactive terminal access directly into a running container, which would be genuinely useful for debugging.
 
 **Proper migrations.** Prisma's `db push` works fine for development but a real migration history would make schema changes safer and easier to reason about across environments.
-
-## Brimble Feedback
-
-> https://pearls-and-grey-concierge.brimble.app/
-
-I connected my GitHub account and deployed a landing page to test the platform.
-
-The connect-with-GitHub flow is smooth and the zero-config build experience is genuinely impressive. Selecting a repo and hitting deploy without writing a single config file is exactly what developers want. The platform picked up my project type automatically and had it running without any intervention from me. The core loop works well.
-
-The most notable issue I ran into was receiving an email notification saying my project was live while the deployment was still in the in-progress state. That kind of premature notification is confusing. It sets an expectation that the app is ready when it is not. If a user follows that link before the deployment finishes, they hit a dead end. The notification should only fire once the deployment is actually serving traffic.
-
-If I had to prioritize one fix it would be the notification timing. Getting that wrong erodes trust in the platform faster than almost any other issue, because it is the first thing a new user experiences after a successful deploy.
-
----
-
-Rough time spent: 12-15 hours across planning, building, debugging, and writing this up.
