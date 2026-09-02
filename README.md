@@ -106,9 +106,9 @@ SSE: status + logs stream back to the browser
 
 | Layer    | Technology                                                     |
 | -------- | -------------------------------------------------------------- |
-| Frontend | Vite + React + TanStack Router + TanStack Query + Tailwind CSS |
 | Backend  | Node.js + TypeScript + Express + Prisma + SQLite               |
 | Pipeline | Railpack + Docker + BuildKit                                   |
+| Frontend | Vite + React + TanStack Router + TanStack Query + Tailwind CSS |
 | Ingress  | Caddy (dynamically configured via Admin API)                   |
 | Secrets  | HashiCorp Vault                                                |
 | Queue    | BullMQ + Redis                                                 |
